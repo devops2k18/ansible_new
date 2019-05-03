@@ -1,0 +1,116 @@
+- name : WebServer
+  hosts : DEV
+  become : yes
+  vars :
+    - MODJK_URL : http://mirrors.estointernet.in/apache/tomcat/tomcat-connectors/jk/tomcat-connectors-1.2.46-src.tar.gz
+  tasks :
+    - name : define MODJK_FILE variable
+      shell : "echo {{MODJK_URL}} | awk -F '/' '{print $NF}'"
+      register : out
+
+    - name : create MODJK_FILE variable
+      set_fact :
+        MODJK_FILE : "{{out.stdout}}"
+
+    - name : define MODJK_FOLDER variable
+      shell : "echo {{MODJK_FILE}} | sed -e 's/.tar.gz//'"
+      register : modjk
+
+    - name : print the MODJK_FILE output
+      debug :
+        msg : "{{out.stdout}}"
+
+    - name : create MODJK_FOLDER variable
+      set_fact :
+        MODJK_FOLDER : "{{modjk.stdout}}"
+
+    - name : Installing HTTPD
+      yum :
+        name : httpd
+        state : latest
+
+    - name : start httpd
+      service :
+        name : httpd
+        state : started
+        enabled : yes
+
+    - name : get the stats of MODJK
+      stat :
+        path : "/root/{{MODJK_FILE}}"
+      register : st
+
+    - name : download mod_jk
+      get_url :
+        url : "{{MODJK_URL}}"
+        dest : /root
+      when : st.stat.exists == false
+
+    - name : get the stats of MODJK_FOLDER
+      stat :
+        path : "/root/{{MODJK_FOLDER}}"
+      register : st1
+
+    - name : extract mod_jk
+      unarchive :
+        src : "/root/{{MODJK_FILE}}"
+        dest : /root
+        remote_src : yes
+      when : st1.stat.exists == false
+
+    - name : install gcc and httpd-devel
+      yum :
+        name : "{{item}}"
+        state : latest
+      loop :
+        - gcc
+        - httpd-devel
+
+    - name : get the stats of modjk.so
+      stat :
+        path : /etc/httpd/modules/mod_jk.so
+      register : modjk_stat
+
+    - name : install modjk
+      shell : ./configure --with-apxs=/bin/apxs && make && make install
+      args :
+        chdir : /root/tomcat-connectors-1.2.46-src/native
+      when : modjk_stat.stat.exists == false
+
+
+    - name : get the stats of modjk.conf
+      stat :
+        path : /etc/httpd/conf.d/modjk.conf
+      register : modjk_conf
+
+
+    - name : copy modjk.conf
+      copy :
+        src : /tmp/modjk.conf
+        dest : /etc/httpd/conf.d/modjk.conf
+      when : modjk_conf.stat.exists == false
+
+    - name : get the stats of workers.properties
+      stat :
+        path : /etc/httpd/conf.d/workers.properties
+      register : workers
+
+
+
+    - name : create workers.properties
+      blockinfile :
+        path : /etc/httpd/conf.d/workers.properties
+        block : |
+          ### Define workers
+          worker.list=tomcatA
+          ### Set properties
+          worker.tomcatA.type=ajp13
+          worker.tomcatA.host=localhost
+          worker.tomcatA.port=8009
+        create : yes
+      when : workers.stat.exists == false
+
+    - name : restart httpd
+      service :
+        name : httpd
+        state : restarted

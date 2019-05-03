@@ -1,0 +1,21 @@
+- name : PLAY1
+  hosts : DEV
+  tasks :
+    - name : PLAY1 TASK1
+      debug :
+        msg : "PLAY1 and TASK1"
+
+    - name : PLAY1 TASK2
+      debug :
+        msg : "PLAY1 and TASK2"
+
+- name : PLAY2
+  hosts : DEV
+  tasks :
+    - name : PLAY2 TASK1
+      debug :
+        msg : "PLAY2 and TASK1"
+
+    - name : PLAY2 and TASK2
+      debug :
+        msg : "PLAY2 and TASK2"
