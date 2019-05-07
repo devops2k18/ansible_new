@@ -147,10 +147,23 @@
 
     - name : download  and extract tomcat
       unarchive :
-        src : http://mirrors.estointernet.in/apache/tomcat/tomcat-9/v9.0.19/bin/apache-tomcat-9.0.19.tar.gz
+        src : https://www-us.apache.org/dist/tomcat/tomcat-9/v9.0.19/bin/apache-tomcat-9.0.19.tar.gz
         dest : "{{TOMCAT_DIR}}"
         remote_src : yes
       become_user : "{{USERNAME}}"
+
+    - name : find all files from webapps directory
+      find :
+        paths : "{{TOMCAT_DIR}}/apache-tomcat-9.0.19/webapps"
+        file_type : any
+      register : findout
+
+    - name : remove all files
+      file :
+        path : "{{item.path}}"
+        state : absent
+      loop :
+        "{{findout.files}}"
 
     - name : download student.war
       get_url :
@@ -184,5 +197,40 @@
       args :
         chdir : "{{TOMCAT_DIR}}/apache-tomcat-9.0.19/bin"
       when : output.rc != 0
+
+- name : Db-server
+  hosts : DEV
+  become : yes
+  tags :
+    - DB
+  tasks :
+    - name : install mariadb and mariadb-server
+      yum :
+        name : "{{item}}"
+        state : latest
+      loop :
+        - mariadb
+        - mariadb-server
+        - MySQL-python
+
+    - name : run mariadb-server
+      service :
+        name : "mariadb"
+        state : started
+        enabled : yes
+
+    - name : copy studentapp.sql
+      copy :
+        src : studentapp.sql
+        dest : /tmp/studentapp.sql
+
+    - name : run mariadb script
+      mysql_db :
+        state : import
+        name : all
+        target : /tmp/studentapp.sql
+
+
+
 
 
